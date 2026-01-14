@@ -125,6 +125,7 @@ function App() {
   })
 
   const [draggingId, setDraggingId] = useState<number | null>(null)
+  const [showSolution, setShowSolution] = useState(false)
   const [zIndices, setZIndices] = useState<Map<number, number>>(() => {
     const map = new Map<number, number>()
     initialPieces.forEach((piece, index) => {
@@ -219,11 +220,16 @@ function App() {
       let newTop = snapToGrid(dragStartRef.current.startPos.top + deltaY)
 
       const gameRect = gameRef.current.getBoundingClientRect()
-      const maxLeft = gameRect.width - currentPos.width - BORDER * 2
-      const maxTop = gameRect.height - currentPos.height - BORDER * 2
+      const gameWidth = gameRect.width - BORDER * 2
+      const gameHeight = gameRect.height - BORDER * 2
 
-      newLeft = Math.max(0, Math.min(newLeft, maxLeft))
-      newTop = Math.max(0, Math.min(newTop, maxTop))
+      const maxGridIndexX = Math.floor((gameWidth - GRID_OFFSET - currentPos.width) / GRID_SIZE)
+      const maxGridIndexY = Math.floor((gameHeight - GRID_OFFSET - currentPos.height) / GRID_SIZE)
+      const maxLeft = GRID_OFFSET + Math.max(0, maxGridIndexX) * GRID_SIZE
+      const maxTop = GRID_OFFSET + Math.max(0, maxGridIndexY) * GRID_SIZE
+
+      newLeft = Math.max(GRID_OFFSET, Math.min(newLeft, maxLeft))
+      newTop = Math.max(GRID_OFFSET, Math.min(newTop, maxTop))
 
       const hasCollision = checkCollisions(
         draggingId,
@@ -281,6 +287,20 @@ function App() {
             zIndex={zIndices.get(piece.id) || 0}
           />
         ))}
+      </div>
+      <div className="solution-container">
+        <button
+          className="solution-button"
+          onClick={() => setShowSolution(!showSolution)}
+        >
+          {showSolution ? 'Hide Solution' : 'Reveal Solution'}
+        </button>
+        {showSolution && (
+          <p className="solution-text">
+            Move small pieces to corners. Slide vertical pieces aside. 
+            Move the horizontal piece up. Guide the panda down through the center gap.
+          </p>
+        )}
       </div>
     </>
   )
