@@ -9,6 +9,7 @@ const SIZE = 80
 const BORDER = 2
 const MARGIN = 2
 const GRID_SIZE = SIZE + BORDER * 2 + MARGIN
+const GRID_OFFSET = MARGIN + BORDER * 2 // First valid grid position (6px)
 const RECTANGLE = SIZE * 2 + BORDER * 2 + MARGIN
 
 interface PieceConfig {
@@ -76,7 +77,7 @@ function isIntersect(
   const bBottom = bTop + b.height
   const bRight = bLeft + b.width
 
-  return !(bLeft >= aRight || bRight <= aLeft || bTop >= aBottom || bBottom <= aTop)
+  return !(bLeft > aRight || bRight < aLeft || bTop > aBottom || bBottom < aTop)
 }
 
 interface PieceProps {
@@ -141,7 +142,8 @@ function App() {
   }, [])
 
   const snapToGrid = useCallback((value: number): number => {
-    return Math.round(value / GRID_SIZE) * GRID_SIZE
+    const gridIndex = Math.round((value - GRID_OFFSET) / GRID_SIZE)
+    return GRID_OFFSET + Math.max(0, gridIndex) * GRID_SIZE
   }, [])
 
   const checkCollisions = useCallback(
