@@ -1,0 +1,17 @@
+html, body {
+  margin: 0;
+  background: #ebebeb url(https://u-stena.ru/upload/iblock/4d9/4d94caa3d7a98f5873291ec788f5fdac.jpg);
+  background-size: 100%;
+}
+
+h1 {
+  font-family: Arial, serif;
+  text-align: center;
+  color: yellow;
+  text-shadow: 1px 1px 1px #907172, -1px 1px 1px #A1BC7E;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}

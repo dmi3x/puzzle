@@ -1,0 +1,77 @@
+#game {
+  border: 2px solid #3c6305;
+  background: #6aa218;
+  width: 354px;
+  height: 440px;
+  margin: 20px auto;
+  position: relative;
+  box-shadow: 0 0 12px 3px;
+  user-select: none;
+}
+
+.item {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 2px solid #e9dc4f;
+  background: #fff156;
+  position: absolute;
+  text-align: center;
+  font-size: 42px;
+  font-weight: bold;
+  font-family: Arial, serif;
+  cursor: pointer;
+  box-shadow: inset 1px 1px 0 #907172, inset 1px -1px 0 #D4C143;
+  touch-action: none;
+  transition: top 0.1s ease-out, left 0.1s ease-out;
+}
+
+.figure-3 .text {
+  font-size: 80px;
+  opacity: 0.8;
+}
+
+.text {
+  display: inline-block;
+  vertical-align: middle;
+  opacity: 0.8;
+  text-shadow: 1px 1px 1px #907172, -1px 1px 1px #A1BC7E;
+}
+
+.highlight {
+  background: #b4ff52;
+}
+
+.solution-container {
+  text-align: center;
+  margin: 20px auto;
+  max-width: 354px;
+}
+
+.solution-button {
+  background: #4a7c0f;
+  color: white;
+  border: 2px solid #3c6305;
+  padding: 10px 20px;
+  font-size: 16px;
+  font-family: Arial, serif;
+  cursor: pointer;
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.solution-button:hover {
+  background: #5a9412;
+}
+
+.solution-text {
+  background: rgba(255, 255, 255, 0.9);
+  padding: 15px;
+  border-radius: 5px;
+  margin-top: 10px;
+  font-family: Arial, serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #333;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
