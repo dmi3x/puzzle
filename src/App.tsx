@@ -77,7 +77,7 @@ function isIntersect(
   const bBottom = bTop + b.height
   const bRight = bLeft + b.width
 
-  return !(bLeft > aRight || bRight < aLeft || bTop > aBottom || bBottom < aTop)
+  return !(bLeft >= aRight || bRight <= aLeft || bTop >= aBottom || bBottom <= aTop)
 }
 
 interface PieceProps {
