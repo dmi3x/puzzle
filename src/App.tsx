@@ -7,6 +7,10 @@ interface Move {
   toCol: number
 }
 
+interface GameState {
+  positions: Map<number, { row: number; col: number }>
+}
+
 const H = 1
 const V = 2
 const HV = 3
@@ -86,34 +90,168 @@ function isIntersect(
   return !(bLeft >= aRight || bRight <= aLeft || bTop >= aBottom || bBottom <= aTop)
 }
 
-// Optimal solution for this Klotski configuration (81 moves)
-const OPTIMAL_SOLUTION: Move[] = [
-  {pieceId:9,toRow:5,toCol:2},{pieceId:7,toRow:5,toCol:1},{pieceId:6,toRow:5,toCol:2},{pieceId:4,toRow:4,toCol:1},
-  {pieceId:1,toRow:2,toCol:1},{pieceId:2,toRow:1,toCol:1},{pieceId:3,toRow:2,toCol:4},{pieceId:5,toRow:4,toCol:4},
-  {pieceId:8,toRow:5,toCol:4},{pieceId:10,toRow:5,toCol:3},{pieceId:6,toRow:5,toCol:2},{pieceId:7,toRow:4,toCol:2},
-  {pieceId:9,toRow:4,toCol:1},{pieceId:4,toRow:5,toCol:1},{pieceId:1,toRow:3,toCol:1},{pieceId:2,toRow:2,toCol:1},
-  {pieceId:3,toRow:1,toCol:4},{pieceId:5,toRow:3,toCol:4},{pieceId:8,toRow:4,toCol:4},{pieceId:10,toRow:4,toCol:3},
-  {pieceId:6,toRow:4,toCol:2},{pieceId:7,toRow:3,toCol:2},{pieceId:9,toRow:3,toCol:1},{pieceId:4,toRow:4,toCol:1},
-  {pieceId:1,toRow:5,toCol:1},{pieceId:2,toRow:3,toCol:1},{pieceId:9,toRow:2,toCol:1},{pieceId:7,toRow:2,toCol:2},
-  {pieceId:10,toRow:2,toCol:3},{pieceId:8,toRow:2,toCol:4},{pieceId:5,toRow:4,toCol:4},{pieceId:3,toRow:2,toCol:4},
-  {pieceId:2,toRow:1,toCol:2},{pieceId:9,toRow:1,toCol:1},{pieceId:7,toRow:1,toCol:2},{pieceId:10,toRow:1,toCol:3},
-  {pieceId:8,toRow:1,toCol:4},{pieceId:5,toRow:3,toCol:4},{pieceId:3,toRow:1,toCol:4},{pieceId:2,toRow:2,toCol:2},
-  {pieceId:9,toRow:2,toCol:1},{pieceId:4,toRow:2,toCol:1},{pieceId:1,toRow:3,toCol:1},{pieceId:6,toRow:3,toCol:2},
-  {pieceId:7,toRow:4,toCol:2},{pieceId:10,toRow:4,toCol:3},{pieceId:8,toRow:4,toCol:4},{pieceId:5,toRow:5,toCol:4},
-  {pieceId:3,toRow:3,toCol:4},{pieceId:2,toRow:3,toCol:2},{pieceId:9,toRow:3,toCol:1},{pieceId:4,toRow:3,toCol:1},
-  {pieceId:1,toRow:4,toCol:1},{pieceId:6,toRow:5,toCol:2},{pieceId:7,toRow:5,toCol:1},{pieceId:9,toRow:5,toCol:2},
-  {pieceId:4,toRow:5,toCol:1},{pieceId:1,toRow:4,toCol:1},{pieceId:2,toRow:4,toCol:2},{pieceId:3,toRow:4,toCol:4},
-  {pieceId:5,toRow:3,toCol:4},{pieceId:8,toRow:3,toCol:4},{pieceId:10,toRow:3,toCol:3},{pieceId:7,toRow:3,toCol:2},
-  {pieceId:9,toRow:4,toCol:2},{pieceId:4,toRow:4,toCol:1},{pieceId:1,toRow:5,toCol:1},{pieceId:6,toRow:4,toCol:2},
-  {pieceId:2,toRow:5,toCol:2},{pieceId:3,toRow:5,toCol:4},{pieceId:5,toRow:4,toCol:4},{pieceId:8,toRow:2,toCol:4},
-  {pieceId:10,toRow:2,toCol:3},{pieceId:7,toRow:2,toCol:2},{pieceId:9,toRow:3,toCol:2},{pieceId:4,toRow:3,toCol:1},
-  {pieceId:1,toRow:4,toCol:1},{pieceId:6,toRow:5,toCol:2},{pieceId:2,toRow:4,toCol:2}
-]
+// Helper functions for solver
+function getPieceSize(pieceId: number): { rows: number; cols: number } {
+  const piece = initialPieces.find((p) => p.id === pieceId)!
+  switch (piece.type) {
+    case H:
+      return { rows: 1, cols: 2 }
+    case V:
+      return { rows: 2, cols: 1 }
+    case HV:
+      return { rows: 2, cols: 2 }
+    default:
+      return { rows: 1, cols: 1 }
+  }
+}
+
+function checkGridCollision(
+  pieceId: number,
+  row: number,
+  col: number,
+  state: GameState
+): boolean {
+  const size = getPieceSize(pieceId)
+
+  // Check bounds (5 rows x 4 cols grid)
+  if (row < 1 || col < 1 || row + size.rows - 1 > 5 || col + size.cols - 1 > 4) {
+    return true
+  }
+
+  // Check collision with other pieces
+  for (const [otherId, otherPos] of state.positions) {
+    if (otherId === pieceId) continue
+
+    const otherSize = getPieceSize(otherId)
+
+    // Check if rectangles overlap
+    const thisRight = col + size.cols - 1
+    const thisBottom = row + size.rows - 1
+    const otherRight = otherPos.col + otherSize.cols - 1
+    const otherBottom = otherPos.row + otherSize.rows - 1
+
+    const overlaps = !(
+      col > otherRight ||
+      thisRight < otherPos.col ||
+      row > otherBottom ||
+      thisBottom < otherPos.row
+    )
+
+    if (overlaps) return true
+  }
+
+  return false
+}
+
+function getPossibleMoves(state: GameState): Move[] {
+  const moves: Move[] = []
+
+  for (const [pieceId, pos] of state.positions) {
+    // Try moving in all 4 directions
+    const directions = [
+      { row: pos.row - 1, col: pos.col }, // up
+      { row: pos.row + 1, col: pos.col }, // down
+      { row: pos.row, col: pos.col - 1 }, // left
+      { row: pos.row, col: pos.col + 1 }, // right
+    ]
+
+    for (const newPos of directions) {
+      if (!checkGridCollision(pieceId, newPos.row, newPos.col, state)) {
+        moves.push({
+          pieceId,
+          toRow: newPos.row,
+          toCol: newPos.col,
+        })
+      }
+    }
+  }
+
+  return moves
+}
+
+function serializeState(state: GameState): string {
+  const positions = Array.from(state.positions.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([id, pos]) => `${id}:${pos.row},${pos.col}`)
+    .join('|')
+  return positions
+}
+
+function calculateHeuristic(state: GameState): number {
+  const pandaPos = state.positions.get(2)!
+  const targetRow = 4
+  const targetCol = 2
+  // Manhattan distance from panda to target
+  return Math.abs(pandaPos.row - targetRow) + Math.abs(pandaPos.col - targetCol)
+}
 
 function solvePuzzle(): Move[] | null {
-  // Return pre-computed optimal solution
-  console.log(`✅ Using pre-computed optimal solution (${OPTIMAL_SOLUTION.length} moves)`)
-  return OPTIMAL_SOLUTION
+  const initialState: GameState = {
+    positions: new Map(
+      initialPieces.map((p) => [p.id, { row: p.row, col: p.col }])
+    ),
+  }
+
+  // Use BFS for guaranteed shortest path
+  const queue: Array<{ state: GameState; moves: Move[]; priority: number }> = [
+    { state: initialState, moves: [], priority: calculateHeuristic(initialState) }
+  ]
+  const visited = new Set<string>()
+  visited.add(serializeState(initialState))
+
+  let statesExplored = 0
+  const maxStates = 100000 // Limit exploration
+
+  while (queue.length > 0 && statesExplored < maxStates) {
+    // A* - sort by priority
+    queue.sort((a, b) => a.priority - b.priority)
+    const current = queue.shift()!
+    statesExplored++
+
+    const pandaPos = current.state.positions.get(2)!
+
+    // Check if panda reached target position (row 4, col 2 or 3)
+    if (pandaPos.row === 4 && pandaPos.col === 2) {
+      console.log(`✅ Solution found in ${current.moves.length} moves!`)
+      console.log(`States explored: ${statesExplored}`)
+      return current.moves
+    }
+
+    // Progress logging
+    if (statesExplored % 5000 === 0) {
+      console.log(`Progress: ${statesExplored} states, queue: ${queue.length}`)
+    }
+
+    // Generate all possible moves
+    const possibleMoves = getPossibleMoves(current.state)
+
+    for (const move of possibleMoves) {
+      const newState: GameState = {
+        positions: new Map(current.state.positions),
+      }
+      newState.positions.set(move.pieceId, {
+        row: move.toRow,
+        col: move.toCol,
+      })
+
+      const stateKey = serializeState(newState)
+      if (!visited.has(stateKey)) {
+        visited.add(stateKey)
+        const newMoves = [...current.moves, move]
+        const heuristic = calculateHeuristic(newState)
+        const priority = newMoves.length + heuristic
+
+        queue.push({
+          state: newState,
+          moves: newMoves,
+          priority,
+        })
+      }
+    }
+  }
+
+  console.log(`❌ No solution found after ${statesExplored} states`)
+  return null
 }
 
 interface PieceProps {
