@@ -1,6 +1,47 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import './App.css'
 
+interface Move {
+  pieceId: number
+  toRow: number
+  toCol: number
+}
+
+// Optimal solution sequence for the puzzle
+const SOLUTION_MOVES: Move[] = [
+  // Move small pieces to create space
+  { pieceId: 9, toRow: 5, toCol: 2 },   // Lizard right
+  { pieceId: 7, toRow: 5, toCol: 1 },   // Butterfly down
+  { pieceId: 6, toRow: 4, toCol: 2 },   // Leaf down
+  { pieceId: 4, toRow: 4, toCol: 1 },   // Left bamboo down
+  { pieceId: 1, toRow: 2, toCol: 1 },   // Left bamboo down
+  { pieceId: 2, toRow: 2, toCol: 1 },   // Panda left
+  { pieceId: 1, toRow: 1, toCol: 1 },   // Left bamboo up
+  { pieceId: 4, toRow: 3, toCol: 1 },   // Left bamboo up
+  { pieceId: 6, toRow: 3, toCol: 2 },   // Leaf up
+  { pieceId: 7, toRow: 4, toCol: 2 },   // Butterfly up
+  { pieceId: 9, toRow: 4, toCol: 1 },   // Lizard left
+  { pieceId: 10, toRow: 5, toCol: 3 },  // Bug left
+  { pieceId: 8, toRow: 5, toCol: 4 },   // Parrot down
+  { pieceId: 5, toRow: 4, toCol: 4 },   // Right bamboo down
+  { pieceId: 3, toRow: 2, toCol: 4 },   // Right bamboo down
+  { pieceId: 2, toRow: 2, toCol: 3 },   // Panda right
+  { pieceId: 3, toRow: 1, toCol: 4 },   // Right bamboo up
+  { pieceId: 5, toRow: 3, toCol: 4 },   // Right bamboo up
+  { pieceId: 8, toRow: 4, toCol: 4 },   // Parrot up
+  { pieceId: 10, toRow: 4, toCol: 3 },  // Bug right
+  { pieceId: 6, toRow: 4, toCol: 2 },   // Leaf down
+  { pieceId: 7, toRow: 3, toCol: 2 },   // Butterfly up
+  { pieceId: 9, toRow: 3, toCol: 1 },   // Lizard up
+  { pieceId: 4, toRow: 5, toCol: 1 },   // Left bamboo down
+  { pieceId: 2, toRow: 3, toCol: 2 },   // Panda down
+  { pieceId: 9, toRow: 2, toCol: 1 },   // Lizard up
+  { pieceId: 7, toRow: 2, toCol: 2 },   // Butterfly left
+  { pieceId: 10, toRow: 2, toCol: 3 },  // Bug up
+  { pieceId: 8, toRow: 2, toCol: 4 },   // Parrot up
+  { pieceId: 2, toRow: 4, toCol: 2 },   // Panda down - FINAL MOVE!
+]
+
 const H = 1
 const V = 2
 const HV = 3
@@ -125,7 +166,6 @@ function App() {
   })
 
   const [draggingId, setDraggingId] = useState<number | null>(null)
-  const [showSolution, setShowSolution] = useState(false)
   const [zIndices, setZIndices] = useState<Map<number, number>>(() => {
     const map = new Map<number, number>()
     initialPieces.forEach((piece, index) => {
@@ -133,6 +173,10 @@ function App() {
     })
     return map
   })
+
+  const [isAnimating, setIsAnimating] = useState(false)
+  const [currentMoveIndex, setCurrentMoveIndex] = useState(0)
+  const animationIntervalRef = useRef<number | null>(null)
 
   const dragStartRef = useRef<{ x: number; y: number; startPos: PiecePosition } | null>(null)
   const gameRef = useRef<HTMLDivElement>(null)
@@ -274,6 +318,69 @@ function App() {
     }
   }, [draggingId, handleDragMove, handleDragEnd])
 
+  const resetToInitialState = useCallback(() => {
+    const newPositions = new Map<number, PiecePosition>()
+    initialPieces.forEach((piece) => {
+      newPositions.set(piece.id, calculatePosition(piece.row, piece.col, piece.type))
+    })
+    setPositions(newPositions)
+    setCurrentMoveIndex(0)
+  }, [])
+
+  const stopAnimation = useCallback(() => {
+    if (animationIntervalRef.current) {
+      clearInterval(animationIntervalRef.current)
+      animationIntervalRef.current = null
+    }
+    setIsAnimating(false)
+  }, [])
+
+  const executeMove = useCallback((move: Move) => {
+    const piece = getPieceConfig(move.pieceId)
+    const newPosition = calculatePosition(move.toRow, move.toCol, piece.type)
+
+    setPositions((prev) => {
+      const newMap = new Map(prev)
+      newMap.set(move.pieceId, newPosition)
+      return newMap
+    })
+  }, [getPieceConfig])
+
+  const startAutoSolve = useCallback(() => {
+    if (isAnimating) return
+
+    const confirmed = window.confirm(
+      'This will reset the puzzle and show the animated solution. Continue?'
+    )
+
+    if (!confirmed) return
+
+    resetToInitialState()
+    setIsAnimating(true)
+
+    let moveIndex = 0
+
+    animationIntervalRef.current = setInterval(() => {
+      if (moveIndex >= SOLUTION_MOVES.length) {
+        stopAnimation()
+        return
+      }
+
+      const move = SOLUTION_MOVES[moveIndex]
+      executeMove(move)
+      setCurrentMoveIndex(moveIndex + 1)
+      moveIndex++
+    }, 500) // 500ms between moves
+  }, [isAnimating, resetToInitialState, stopAnimation, executeMove])
+
+  useEffect(() => {
+    return () => {
+      if (animationIntervalRef.current) {
+        clearInterval(animationIntervalRef.current)
+      }
+    }
+  }, [])
+
   return (
     <>
       <h1>Help the panda get down</h1>
@@ -289,17 +396,25 @@ function App() {
         ))}
       </div>
       <div className="solution-container">
-        <button
-          className="solution-button"
-          onClick={() => setShowSolution(!showSolution)}
-        >
-          {showSolution ? 'Hide Solution' : 'Reveal Solution'}
-        </button>
-        {showSolution && (
-          <p className="solution-text">
-            Move small pieces to corners. Slide vertical pieces aside. 
-            Move the horizontal piece up. Guide the panda down through the center gap.
-          </p>
+        {!isAnimating ? (
+          <button
+            className="solution-button"
+            onClick={startAutoSolve}
+          >
+            🎬 Auto-Solve Puzzle
+          </button>
+        ) : (
+          <div className="animation-controls">
+            <button
+              className="solution-button stop-button"
+              onClick={stopAnimation}
+            >
+              ⏹️ Stop Animation
+            </button>
+            <p className="animation-status">
+              Move {currentMoveIndex} / {SOLUTION_MOVES.length}
+            </p>
+          </div>
         )}
       </div>
     </>

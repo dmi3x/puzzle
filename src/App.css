@@ -64,14 +64,34 @@
   background: #5a9412;
 }
 
-.solution-text {
+.solution-button:active {
+  transform: translateY(1px);
+}
+
+.stop-button {
+  background: #dc2626;
+  border-color: #991b1b;
+}
+
+.stop-button:hover {
+  background: #ef4444;
+}
+
+.animation-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.animation-status {
   background: rgba(255, 255, 255, 0.9);
-  padding: 15px;
+  padding: 10px 20px;
   border-radius: 5px;
-  margin-top: 10px;
   font-family: Arial, serif;
   font-size: 14px;
-  line-height: 1.5;
+  font-weight: bold;
   color: #333;
+  margin: 0;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
