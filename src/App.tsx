@@ -7,40 +7,14 @@ interface Move {
   toCol: number
 }
 
-// Optimal solution sequence for the puzzle
-const SOLUTION_MOVES: Move[] = [
-  // Move small pieces to create space
-  { pieceId: 9, toRow: 5, toCol: 2 },   // Lizard right
-  { pieceId: 7, toRow: 5, toCol: 1 },   // Butterfly down
-  { pieceId: 6, toRow: 4, toCol: 2 },   // Leaf down
-  { pieceId: 4, toRow: 4, toCol: 1 },   // Left bamboo down
-  { pieceId: 1, toRow: 2, toCol: 1 },   // Left bamboo down
-  { pieceId: 2, toRow: 2, toCol: 1 },   // Panda left
-  { pieceId: 1, toRow: 1, toCol: 1 },   // Left bamboo up
-  { pieceId: 4, toRow: 3, toCol: 1 },   // Left bamboo up
-  { pieceId: 6, toRow: 3, toCol: 2 },   // Leaf up
-  { pieceId: 7, toRow: 4, toCol: 2 },   // Butterfly up
-  { pieceId: 9, toRow: 4, toCol: 1 },   // Lizard left
-  { pieceId: 10, toRow: 5, toCol: 3 },  // Bug left
-  { pieceId: 8, toRow: 5, toCol: 4 },   // Parrot down
-  { pieceId: 5, toRow: 4, toCol: 4 },   // Right bamboo down
-  { pieceId: 3, toRow: 2, toCol: 4 },   // Right bamboo down
-  { pieceId: 2, toRow: 2, toCol: 3 },   // Panda right
-  { pieceId: 3, toRow: 1, toCol: 4 },   // Right bamboo up
-  { pieceId: 5, toRow: 3, toCol: 4 },   // Right bamboo up
-  { pieceId: 8, toRow: 4, toCol: 4 },   // Parrot up
-  { pieceId: 10, toRow: 4, toCol: 3 },  // Bug right
-  { pieceId: 6, toRow: 4, toCol: 2 },   // Leaf down
-  { pieceId: 7, toRow: 3, toCol: 2 },   // Butterfly up
-  { pieceId: 9, toRow: 3, toCol: 1 },   // Lizard up
-  { pieceId: 4, toRow: 5, toCol: 1 },   // Left bamboo down
-  { pieceId: 2, toRow: 3, toCol: 2 },   // Panda down
-  { pieceId: 9, toRow: 2, toCol: 1 },   // Lizard up
-  { pieceId: 7, toRow: 2, toCol: 2 },   // Butterfly left
-  { pieceId: 10, toRow: 2, toCol: 3 },  // Bug up
-  { pieceId: 8, toRow: 2, toCol: 4 },   // Parrot up
-  { pieceId: 2, toRow: 4, toCol: 2 },   // Panda down - FINAL MOVE!
-]
+interface GameState {
+  positions: Map<number, { row: number; col: number }>
+}
+
+interface QueueItem {
+  state: GameState
+  moves: Move[]
+}
 
 const H = 1
 const V = 2
@@ -121,6 +95,176 @@ function isIntersect(
   return !(bLeft >= aRight || bRight <= aLeft || bTop >= aBottom || bBottom <= aTop)
 }
 
+// Solver functions
+function serializeState(state: GameState): string {
+  const positions = Array.from(state.positions.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([id, pos]) => `${id}:${pos.row},${pos.col}`)
+    .join('|')
+  return positions
+}
+
+function getPieceSize(pieceId: number): { rows: number; cols: number } {
+  const piece = initialPieces.find((p) => p.id === pieceId)!
+  switch (piece.type) {
+    case H:
+      return { rows: 1, cols: 2 }
+    case V:
+      return { rows: 2, cols: 1 }
+    case HV:
+      return { rows: 2, cols: 2 }
+    default:
+      return { rows: 1, cols: 1 }
+  }
+}
+
+function checkGridCollision(
+  pieceId: number,
+  row: number,
+  col: number,
+  state: GameState
+): boolean {
+  const size = getPieceSize(pieceId)
+
+  // Check bounds (5 rows x 4 cols grid)
+  if (row < 1 || col < 1 || row + size.rows - 1 > 5 || col + size.cols - 1 > 4) {
+    return true
+  }
+
+  // Check collision with other pieces
+  for (const [otherId, otherPos] of state.positions) {
+    if (otherId === pieceId) continue
+
+    const otherSize = getPieceSize(otherId)
+
+    // Check if rectangles overlap
+    const thisRight = col + size.cols - 1
+    const thisBottom = row + size.rows - 1
+    const otherRight = otherPos.col + otherSize.cols - 1
+    const otherBottom = otherPos.row + otherSize.rows - 1
+
+    const overlaps = !(
+      col > otherRight ||
+      thisRight < otherPos.col ||
+      row > otherBottom ||
+      thisBottom < otherPos.row
+    )
+
+    if (overlaps) return true
+  }
+
+  return false
+}
+
+function getPossibleMoves(state: GameState): Move[] {
+  const moves: Move[] = []
+
+  for (const [pieceId, pos] of state.positions) {
+    // Try moving in all 4 directions
+    const directions = [
+      { row: pos.row - 1, col: pos.col }, // up
+      { row: pos.row + 1, col: pos.col }, // down
+      { row: pos.row, col: pos.col - 1 }, // left
+      { row: pos.row, col: pos.col + 1 }, // right
+    ]
+
+    for (const newPos of directions) {
+      if (!checkGridCollision(pieceId, newPos.row, newPos.col, state)) {
+        moves.push({
+          pieceId,
+          toRow: newPos.row,
+          toCol: newPos.col,
+        })
+      }
+    }
+  }
+
+  return moves
+}
+
+function calculateHeuristic(state: GameState): number {
+  const pandaPos = state.positions.get(2)!
+  const targetRow = 4
+  const targetCol = 2
+
+  // Manhattan distance from panda to target
+  return Math.abs(pandaPos.row - targetRow) + Math.abs(pandaPos.col - targetCol)
+}
+
+interface PriorityQueueItem extends QueueItem {
+  priority: number
+}
+
+function solvePuzzle(): Move[] | null {
+  const initialState: GameState = {
+    positions: new Map(
+      initialPieces.map((p) => [p.id, { row: p.row, col: p.col }])
+    ),
+  }
+
+  const queue: PriorityQueueItem[] = [{
+    state: initialState,
+    moves: [],
+    priority: calculateHeuristic(initialState)
+  }]
+  const visited = new Set<string>()
+  visited.add(serializeState(initialState))
+
+  let statesExplored = 0
+  const maxStates = 500000 // Limit to prevent infinite loops
+
+  while (queue.length > 0 && statesExplored < maxStates) {
+    // Sort queue by priority (A* search)
+    queue.sort((a, b) => a.priority - b.priority)
+    const current = queue.shift()!
+    statesExplored++
+
+    const pandaPos = current.state.positions.get(2)!
+
+    // Check if panda reached target position (row 4, col 2)
+    if (pandaPos.row === 4 && pandaPos.col === 2) {
+      console.log(`✅ Solution found in ${current.moves.length} moves!`)
+      console.log(`States explored: ${statesExplored}`)
+      return current.moves
+    }
+
+    // Log progress every 10000 states
+    if (statesExplored % 10000 === 0) {
+      console.log(`Progress: ${statesExplored} states, queue: ${queue.length}`)
+    }
+
+    // Generate all possible moves
+    const possibleMoves = getPossibleMoves(current.state)
+
+    for (const move of possibleMoves) {
+      const newState: GameState = {
+        positions: new Map(current.state.positions),
+      }
+      newState.positions.set(move.pieceId, {
+        row: move.toRow,
+        col: move.toCol,
+      })
+
+      const stateKey = serializeState(newState)
+      if (!visited.has(stateKey)) {
+        visited.add(stateKey)
+        const newMoves = [...current.moves, move]
+        const heuristic = calculateHeuristic(newState)
+        const priority = newMoves.length + heuristic // f(n) = g(n) + h(n)
+
+        queue.push({
+          state: newState,
+          moves: newMoves,
+          priority,
+        })
+      }
+    }
+  }
+
+  console.log(`❌ No solution found after exploring ${statesExplored} states`)
+  return null
+}
+
 interface PieceProps {
   config: PieceConfig
   position: PiecePosition
@@ -177,6 +321,9 @@ function App() {
   const [isAnimating, setIsAnimating] = useState(false)
   const [currentMoveIndex, setCurrentMoveIndex] = useState(0)
   const animationIntervalRef = useRef<number | null>(null)
+
+  const [solution, setSolution] = useState<Move[] | null>(null)
+  const [solutionStatus, setSolutionStatus] = useState<'idle' | 'solving' | 'solved' | 'error'>('idle')
 
   const dragStartRef = useRef<{ x: number; y: number; startPos: PiecePosition } | null>(null)
   const gameRef = useRef<HTMLDivElement>(null)
@@ -347,7 +494,7 @@ function App() {
   }, [getPieceConfig])
 
   const startAutoSolve = useCallback(() => {
-    if (isAnimating) return
+    if (isAnimating || !solution) return
 
     const confirmed = window.confirm(
       'This will reset the puzzle and show the animated solution. Continue?'
@@ -361,17 +508,17 @@ function App() {
     let moveIndex = 0
 
     animationIntervalRef.current = setInterval(() => {
-      if (moveIndex >= SOLUTION_MOVES.length) {
+      if (moveIndex >= solution.length) {
         stopAnimation()
         return
       }
 
-      const move = SOLUTION_MOVES[moveIndex]
+      const move = solution[moveIndex]
       executeMove(move)
       setCurrentMoveIndex(moveIndex + 1)
       moveIndex++
     }, 500) // 500ms between moves
-  }, [isAnimating, resetToInitialState, stopAnimation, executeMove])
+  }, [isAnimating, solution, resetToInitialState, stopAnimation, executeMove])
 
   useEffect(() => {
     return () => {
@@ -379,6 +526,33 @@ function App() {
         clearInterval(animationIntervalRef.current)
       }
     }
+  }, [])
+
+  // Compute solution on mount
+  useEffect(() => {
+    setSolutionStatus('solving')
+    console.log('Computing optimal solution...')
+    const startTime = Date.now()
+
+    // Run solver in a timeout to not block rendering
+    setTimeout(() => {
+      try {
+        const moves = solvePuzzle()
+        const endTime = Date.now()
+
+        if (moves) {
+          setSolution(moves)
+          setSolutionStatus('solved')
+          console.log(`Solution computed in ${endTime - startTime}ms`)
+        } else {
+          setSolutionStatus('error')
+          console.error('Failed to find solution')
+        }
+      } catch (error) {
+        setSolutionStatus('error')
+        console.error('Error computing solution:', error)
+      }
+    }, 100)
   }, [])
 
   return (
@@ -396,14 +570,25 @@ function App() {
         ))}
       </div>
       <div className="solution-container">
-        {!isAnimating ? (
+        {solutionStatus === 'solving' && (
+          <button className="solution-button" disabled>
+            ⏳ Computing solution...
+          </button>
+        )}
+        {solutionStatus === 'error' && (
+          <button className="solution-button" disabled>
+            ❌ Failed to compute solution
+          </button>
+        )}
+        {solutionStatus === 'solved' && !isAnimating && (
           <button
             className="solution-button"
             onClick={startAutoSolve}
           >
-            🎬 Auto-Solve Puzzle
+            🎬 Auto-Solve Puzzle ({solution?.length} moves)
           </button>
-        ) : (
+        )}
+        {isAnimating && (
           <div className="animation-controls">
             <button
               className="solution-button stop-button"
@@ -412,7 +597,7 @@ function App() {
               ⏹️ Stop Animation
             </button>
             <p className="animation-status">
-              Move {currentMoveIndex} / {SOLUTION_MOVES.length}
+              Move {currentMoveIndex} / {solution?.length || 0}
             </p>
           </div>
         )}
