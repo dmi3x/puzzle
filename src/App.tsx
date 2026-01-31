@@ -175,10 +175,6 @@ function App() {
       const deltaX = targetPos.left - startPos.left
       const deltaY = targetPos.top - startPos.top
 
-      if (deltaX !== 0 && deltaY !== 0) {
-        return false
-      }
-
       const steps = Math.max(Math.abs(deltaX), Math.abs(deltaY)) / GRID_SIZE
       const stepX = deltaX === 0 ? 0 : GRID_SIZE * Math.sign(deltaX)
       const stepY = deltaY === 0 ? 0 : GRID_SIZE * Math.sign(deltaY)
