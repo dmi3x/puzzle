@@ -248,6 +248,14 @@ function App() {
       let newLeft = snapToGrid(dragStartRef.current.startPos.left + deltaX)
       let newTop = snapToGrid(dragStartRef.current.startPos.top + deltaY)
 
+      if (newLeft !== dragStartRef.current.startPos.left && newTop !== dragStartRef.current.startPos.top) {
+        if (Math.abs(deltaX) >= Math.abs(deltaY)) {
+          newTop = dragStartRef.current.startPos.top
+        } else {
+          newLeft = dragStartRef.current.startPos.left
+        }
+      }
+
       const gameRect = gameRef.current.getBoundingClientRect()
       const gameWidth = gameRect.width - BORDER * 2
       const gameHeight = gameRect.height - BORDER * 2
