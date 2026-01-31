@@ -1,12 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import './App.css'
 
-interface Move {
-  pieceId: number
-  toRow: number
-  toCol: number
-}
-
 const H = 1
 const V = 2
 const HV = 3
@@ -86,166 +80,6 @@ function isIntersect(
   return !(bLeft >= aRight || bRight <= aLeft || bTop >= aBottom || bBottom <= aTop)
 }
 
-const BOARD_ROWS = 5
-const BOARD_COLS = 4
-const TARGET_PIECE_ID = 2
-const TARGET_ROW = 4
-const TARGET_COL = 2
-
-const getPieceSize = (type: number | null) => {
-  switch (type) {
-    case H:
-      return { width: 2, height: 1 }
-    case V:
-      return { width: 1, height: 2 }
-    case HV:
-      return { width: 2, height: 2 }
-    default:
-      return { width: 1, height: 1 }
-  }
-}
-
-const buildGrid = (state: Array<{ row: number; col: number; type: number | null }>) => {
-  const grid: number[][] = Array.from({ length: BOARD_ROWS }, () =>
-    Array.from({ length: BOARD_COLS }, () => 0)
-  )
-
-  state.forEach((piece, index) => {
-    const size = getPieceSize(piece.type)
-    for (let r = 0; r < size.height; r += 1) {
-      for (let c = 0; c < size.width; c += 1) {
-        const gridRow = piece.row - 1 + r
-        const gridCol = piece.col - 1 + c
-        grid[gridRow][gridCol] = index + 1
-      }
-    }
-  })
-
-  return grid
-}
-
-const isWithinBounds = (row: number, col: number, size: { width: number; height: number }) => {
-  return (
-    row >= 1 &&
-    col >= 1 &&
-    row + size.height - 1 <= BOARD_ROWS &&
-    col + size.width - 1 <= BOARD_COLS
-  )
-}
-
-const solvePuzzle = (): Move[] | null => {
-  const pieces = initialPieces.map((piece) => ({
-    id: piece.id,
-    type: piece.type,
-  }))
-
-  const startState = initialPieces.map((piece) => ({
-    row: piece.row,
-    col: piece.col,
-    type: piece.type,
-  }))
-
-  const serialize = (state: Array<{ row: number; col: number }>) =>
-    state.map((piece) => `${piece.row},${piece.col}`).join('|')
-
-  const queue: Array<{ state: Array<{ row: number; col: number; type: number | null }> }> = [
-    { state: startState },
-  ]
-  const visited = new Map<string, { prev: string | null; move: Move | null }>()
-  const startKey = serialize(startState)
-  visited.set(startKey, { prev: null, move: null })
-
-  while (queue.length > 0) {
-    const { state } = queue.shift()!
-    const currentKey = serialize(state)
-
-    const targetIndex = pieces.findIndex((piece) => piece.id === TARGET_PIECE_ID)
-    const targetState = state[targetIndex]
-    if (targetState.row === TARGET_ROW && targetState.col === TARGET_COL) {
-      const moves: Move[] = []
-      let key: string | null = currentKey
-      while (key) {
-        const entry = visited.get(key)
-        if (entry?.move) {
-          moves.push(entry.move)
-        }
-        key = entry?.prev ?? null
-      }
-      return moves.reverse()
-    }
-
-    const grid = buildGrid(state)
-
-    state.forEach((pieceState, index) => {
-      const size = getPieceSize(pieceState.type)
-      const directions = [
-        { dr: -1, dc: 0 },
-        { dr: 1, dc: 0 },
-        { dr: 0, dc: -1 },
-        { dr: 0, dc: 1 },
-      ]
-
-      directions.forEach(({ dr, dc }) => {
-        const nextRow = pieceState.row + dr
-        const nextCol = pieceState.col + dc
-
-        if (!isWithinBounds(nextRow, nextCol, size)) return
-
-        let canMove = true
-        if (dr === -1) {
-          for (let c = 0; c < size.width; c += 1) {
-            if (grid[pieceState.row - 2][pieceState.col - 1 + c] !== 0) {
-              canMove = false
-              break
-            }
-          }
-        } else if (dr === 1) {
-          for (let c = 0; c < size.width; c += 1) {
-            if (grid[pieceState.row - 1 + size.height][pieceState.col - 1 + c] !== 0) {
-              canMove = false
-              break
-            }
-          }
-        } else if (dc === -1) {
-          for (let r = 0; r < size.height; r += 1) {
-            if (grid[pieceState.row - 1 + r][pieceState.col - 2] !== 0) {
-              canMove = false
-              break
-            }
-          }
-        } else if (dc === 1) {
-          for (let r = 0; r < size.height; r += 1) {
-            if (grid[pieceState.row - 1 + r][pieceState.col - 1 + size.width] !== 0) {
-              canMove = false
-              break
-            }
-          }
-        }
-
-        if (!canMove) return
-
-        const nextState = state.map((piece, pieceIndex) =>
-          pieceIndex === index
-            ? { ...piece, row: nextRow, col: nextCol }
-            : { ...piece }
-        )
-
-        const nextKey = serialize(nextState)
-        if (visited.has(nextKey)) return
-
-        const pieceId = pieces[index].id
-        visited.set(nextKey, {
-          prev: currentKey,
-          move: { pieceId, toRow: nextRow, toCol: nextCol },
-        })
-        queue.push({ state: nextState })
-      })
-    })
-  }
-
-  return null
-}
-
 interface PieceProps {
   config: PieceConfig
   position: PiecePosition
@@ -298,13 +132,6 @@ function App() {
     })
     return map
   })
-
-  const [isAnimating, setIsAnimating] = useState(false)
-  const [currentMoveIndex, setCurrentMoveIndex] = useState(0)
-  const animationIntervalRef = useRef<number | null>(null)
-
-  const [solution, setSolution] = useState<Move[] | null>(null)
-  const [solutionStatus, setSolutionStatus] = useState<'idle' | 'solving' | 'solved' | 'error'>('idle')
 
   const dragStartRef = useRef<{ x: number; y: number; startPos: PiecePosition } | null>(null)
   const gameRef = useRef<HTMLDivElement>(null)
@@ -496,96 +323,6 @@ function App() {
     }
   }, [draggingId, handleDragMove, handleDragEnd])
 
-  const resetToInitialState = useCallback(() => {
-    const newPositions = new Map<number, PiecePosition>()
-    initialPieces.forEach((piece) => {
-      newPositions.set(piece.id, calculatePosition(piece.row, piece.col, piece.type))
-    })
-    setPositions(newPositions)
-    setCurrentMoveIndex(0)
-  }, [])
-
-  const stopAnimation = useCallback(() => {
-    if (animationIntervalRef.current) {
-      clearInterval(animationIntervalRef.current)
-      animationIntervalRef.current = null
-    }
-    setIsAnimating(false)
-  }, [])
-
-  const executeMove = useCallback((move: Move) => {
-    const piece = getPieceConfig(move.pieceId)
-    const newPosition = calculatePosition(move.toRow, move.toCol, piece.type)
-
-    setPositions((prev) => {
-      const newMap = new Map(prev)
-      newMap.set(move.pieceId, newPosition)
-      return newMap
-    })
-  }, [getPieceConfig])
-
-  const startAutoSolve = useCallback(() => {
-    if (isAnimating || !solution) return
-
-    const confirmed = window.confirm(
-      'This will reset the puzzle and show the animated solution. Continue?'
-    )
-
-    if (!confirmed) return
-
-    resetToInitialState()
-    setIsAnimating(true)
-
-    let moveIndex = 0
-
-    animationIntervalRef.current = setInterval(() => {
-      if (moveIndex >= solution.length) {
-        stopAnimation()
-        return
-      }
-
-      const move = solution[moveIndex]
-      executeMove(move)
-      setCurrentMoveIndex(moveIndex + 1)
-      moveIndex++
-    }, 500) // 500ms between moves
-  }, [isAnimating, solution, resetToInitialState, stopAnimation, executeMove])
-
-  useEffect(() => {
-    return () => {
-      if (animationIntervalRef.current) {
-        clearInterval(animationIntervalRef.current)
-      }
-    }
-  }, [])
-
-  // Compute solution on mount
-  useEffect(() => {
-    setSolutionStatus('solving')
-    console.log('Computing optimal solution...')
-    const startTime = Date.now()
-
-    // Run solver in a timeout to not block rendering
-    setTimeout(() => {
-      try {
-        const moves = solvePuzzle()
-        const endTime = Date.now()
-
-        if (moves) {
-          setSolution(moves)
-          setSolutionStatus('solved')
-          console.log(`Solution computed in ${endTime - startTime}ms`)
-        } else {
-          setSolutionStatus('error')
-          console.error('Failed to find solution')
-        }
-      } catch (error) {
-        setSolutionStatus('error')
-        console.error('Error computing solution:', error)
-      }
-    }, 100)
-  }, [])
-
   return (
     <>
       <h1>Help the panda get down</h1>
@@ -601,37 +338,9 @@ function App() {
         ))}
       </div>
       <div className="solution-container">
-        {solutionStatus === 'solving' && (
-          <button className="solution-button" disabled>
-            ⏳ Computing solution...
-          </button>
-        )}
-        {solutionStatus === 'error' && (
-          <button className="solution-button" disabled>
-            ❌ Failed to compute solution
-          </button>
-        )}
-        {solutionStatus === 'solved' && !isAnimating && (
-          <button
-            className="solution-button"
-            onClick={startAutoSolve}
-          >
-            🎬 Auto-Solve Puzzle ({solution?.length} moves)
-          </button>
-        )}
-        {isAnimating && (
-          <div className="animation-controls">
-            <button
-              className="solution-button stop-button"
-              onClick={stopAnimation}
-            >
-              ⏹️ Stop Animation
-            </button>
-            <p className="animation-status">
-              Move {currentMoveIndex} / {solution?.length || 0}
-            </p>
-          </div>
-        )}
+        <button className="solution-button" disabled>
+          🚫 Auto-solve is disabled
+        </button>
       </div>
     </>
   )
