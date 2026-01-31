@@ -86,34 +86,164 @@ function isIntersect(
   return !(bLeft >= aRight || bRight <= aLeft || bTop >= aBottom || bBottom <= aTop)
 }
 
-// Optimal solution for this Klotski configuration (81 moves)
-const OPTIMAL_SOLUTION: Move[] = [
-  {pieceId:9,toRow:5,toCol:2},{pieceId:7,toRow:5,toCol:1},{pieceId:6,toRow:5,toCol:2},{pieceId:4,toRow:4,toCol:1},
-  {pieceId:1,toRow:2,toCol:1},{pieceId:2,toRow:1,toCol:1},{pieceId:3,toRow:2,toCol:4},{pieceId:5,toRow:4,toCol:4},
-  {pieceId:8,toRow:5,toCol:4},{pieceId:10,toRow:5,toCol:3},{pieceId:6,toRow:5,toCol:2},{pieceId:7,toRow:4,toCol:2},
-  {pieceId:9,toRow:4,toCol:1},{pieceId:4,toRow:5,toCol:1},{pieceId:1,toRow:3,toCol:1},{pieceId:2,toRow:2,toCol:1},
-  {pieceId:3,toRow:1,toCol:4},{pieceId:5,toRow:3,toCol:4},{pieceId:8,toRow:4,toCol:4},{pieceId:10,toRow:4,toCol:3},
-  {pieceId:6,toRow:4,toCol:2},{pieceId:7,toRow:3,toCol:2},{pieceId:9,toRow:3,toCol:1},{pieceId:4,toRow:4,toCol:1},
-  {pieceId:1,toRow:5,toCol:1},{pieceId:2,toRow:3,toCol:1},{pieceId:9,toRow:2,toCol:1},{pieceId:7,toRow:2,toCol:2},
-  {pieceId:10,toRow:2,toCol:3},{pieceId:8,toRow:2,toCol:4},{pieceId:5,toRow:4,toCol:4},{pieceId:3,toRow:2,toCol:4},
-  {pieceId:2,toRow:1,toCol:2},{pieceId:9,toRow:1,toCol:1},{pieceId:7,toRow:1,toCol:2},{pieceId:10,toRow:1,toCol:3},
-  {pieceId:8,toRow:1,toCol:4},{pieceId:5,toRow:3,toCol:4},{pieceId:3,toRow:1,toCol:4},{pieceId:2,toRow:2,toCol:2},
-  {pieceId:9,toRow:2,toCol:1},{pieceId:4,toRow:2,toCol:1},{pieceId:1,toRow:3,toCol:1},{pieceId:6,toRow:3,toCol:2},
-  {pieceId:7,toRow:4,toCol:2},{pieceId:10,toRow:4,toCol:3},{pieceId:8,toRow:4,toCol:4},{pieceId:5,toRow:5,toCol:4},
-  {pieceId:3,toRow:3,toCol:4},{pieceId:2,toRow:3,toCol:2},{pieceId:9,toRow:3,toCol:1},{pieceId:4,toRow:3,toCol:1},
-  {pieceId:1,toRow:4,toCol:1},{pieceId:6,toRow:5,toCol:2},{pieceId:7,toRow:5,toCol:1},{pieceId:9,toRow:5,toCol:2},
-  {pieceId:4,toRow:5,toCol:1},{pieceId:1,toRow:4,toCol:1},{pieceId:2,toRow:4,toCol:2},{pieceId:3,toRow:4,toCol:4},
-  {pieceId:5,toRow:3,toCol:4},{pieceId:8,toRow:3,toCol:4},{pieceId:10,toRow:3,toCol:3},{pieceId:7,toRow:3,toCol:2},
-  {pieceId:9,toRow:4,toCol:2},{pieceId:4,toRow:4,toCol:1},{pieceId:1,toRow:5,toCol:1},{pieceId:6,toRow:4,toCol:2},
-  {pieceId:2,toRow:5,toCol:2},{pieceId:3,toRow:5,toCol:4},{pieceId:5,toRow:4,toCol:4},{pieceId:8,toRow:2,toCol:4},
-  {pieceId:10,toRow:2,toCol:3},{pieceId:7,toRow:2,toCol:2},{pieceId:9,toRow:3,toCol:2},{pieceId:4,toRow:3,toCol:1},
-  {pieceId:1,toRow:4,toCol:1},{pieceId:6,toRow:5,toCol:2},{pieceId:2,toRow:4,toCol:2}
-]
+const BOARD_ROWS = 5
+const BOARD_COLS = 4
+const TARGET_PIECE_ID = 2
+const TARGET_ROW = 4
+const TARGET_COL = 2
 
-function solvePuzzle(): Move[] | null {
-  // Return pre-computed optimal solution
-  console.log(`✅ Using pre-computed optimal solution (${OPTIMAL_SOLUTION.length} moves)`)
-  return OPTIMAL_SOLUTION
+const getPieceSize = (type: number | null) => {
+  switch (type) {
+    case H:
+      return { width: 2, height: 1 }
+    case V:
+      return { width: 1, height: 2 }
+    case HV:
+      return { width: 2, height: 2 }
+    default:
+      return { width: 1, height: 1 }
+  }
+}
+
+const buildGrid = (state: Array<{ row: number; col: number; type: number | null }>) => {
+  const grid: number[][] = Array.from({ length: BOARD_ROWS }, () =>
+    Array.from({ length: BOARD_COLS }, () => 0)
+  )
+
+  state.forEach((piece, index) => {
+    const size = getPieceSize(piece.type)
+    for (let r = 0; r < size.height; r += 1) {
+      for (let c = 0; c < size.width; c += 1) {
+        const gridRow = piece.row - 1 + r
+        const gridCol = piece.col - 1 + c
+        grid[gridRow][gridCol] = index + 1
+      }
+    }
+  })
+
+  return grid
+}
+
+const isWithinBounds = (row: number, col: number, size: { width: number; height: number }) => {
+  return (
+    row >= 1 &&
+    col >= 1 &&
+    row + size.height - 1 <= BOARD_ROWS &&
+    col + size.width - 1 <= BOARD_COLS
+  )
+}
+
+const solvePuzzle = (): Move[] | null => {
+  const pieces = initialPieces.map((piece) => ({
+    id: piece.id,
+    type: piece.type,
+  }))
+
+  const startState = initialPieces.map((piece) => ({
+    row: piece.row,
+    col: piece.col,
+    type: piece.type,
+  }))
+
+  const serialize = (state: Array<{ row: number; col: number }>) =>
+    state.map((piece) => `${piece.row},${piece.col}`).join('|')
+
+  const queue: Array<{ state: Array<{ row: number; col: number; type: number | null }> }> = [
+    { state: startState },
+  ]
+  const visited = new Map<string, { prev: string | null; move: Move | null }>()
+  const startKey = serialize(startState)
+  visited.set(startKey, { prev: null, move: null })
+
+  while (queue.length > 0) {
+    const { state } = queue.shift()!
+    const currentKey = serialize(state)
+
+    const targetIndex = pieces.findIndex((piece) => piece.id === TARGET_PIECE_ID)
+    const targetState = state[targetIndex]
+    if (targetState.row === TARGET_ROW && targetState.col === TARGET_COL) {
+      const moves: Move[] = []
+      let key: string | null = currentKey
+      while (key) {
+        const entry = visited.get(key)
+        if (entry?.move) {
+          moves.push(entry.move)
+        }
+        key = entry?.prev ?? null
+      }
+      return moves.reverse()
+    }
+
+    const grid = buildGrid(state)
+
+    state.forEach((pieceState, index) => {
+      const size = getPieceSize(pieceState.type)
+      const directions = [
+        { dr: -1, dc: 0 },
+        { dr: 1, dc: 0 },
+        { dr: 0, dc: -1 },
+        { dr: 0, dc: 1 },
+      ]
+
+      directions.forEach(({ dr, dc }) => {
+        const nextRow = pieceState.row + dr
+        const nextCol = pieceState.col + dc
+
+        if (!isWithinBounds(nextRow, nextCol, size)) return
+
+        let canMove = true
+        if (dr === -1) {
+          for (let c = 0; c < size.width; c += 1) {
+            if (grid[pieceState.row - 2][pieceState.col - 1 + c] !== 0) {
+              canMove = false
+              break
+            }
+          }
+        } else if (dr === 1) {
+          for (let c = 0; c < size.width; c += 1) {
+            if (grid[pieceState.row - 1 + size.height][pieceState.col - 1 + c] !== 0) {
+              canMove = false
+              break
+            }
+          }
+        } else if (dc === -1) {
+          for (let r = 0; r < size.height; r += 1) {
+            if (grid[pieceState.row - 1 + r][pieceState.col - 2] !== 0) {
+              canMove = false
+              break
+            }
+          }
+        } else if (dc === 1) {
+          for (let r = 0; r < size.height; r += 1) {
+            if (grid[pieceState.row - 1 + r][pieceState.col - 1 + size.width] !== 0) {
+              canMove = false
+              break
+            }
+          }
+        }
+
+        if (!canMove) return
+
+        const nextState = state.map((piece, pieceIndex) =>
+          pieceIndex === index
+            ? { ...piece, row: nextRow, col: nextCol }
+            : { ...piece }
+        )
+
+        const nextKey = serialize(nextState)
+        if (visited.has(nextKey)) return
+
+        const pieceId = pieces[index].id
+        visited.set(nextKey, {
+          prev: currentKey,
+          move: { pieceId, toRow: nextRow, toCol: nextCol },
+        })
+        queue.push({ state: nextState })
+      })
+    })
+  }
+
+  return null
 }
 
 interface PieceProps {
@@ -207,6 +337,40 @@ function App() {
     [positions]
   )
 
+  const isPathClear = useCallback(
+    (
+      startPos: PiecePosition,
+      targetPos: { top: number; left: number },
+      width: number,
+      height: number,
+      pieceId: number
+    ) => {
+      const deltaX = targetPos.left - startPos.left
+      const deltaY = targetPos.top - startPos.top
+
+      if (deltaX !== 0 && deltaY !== 0) {
+        return false
+      }
+
+      const steps = Math.max(Math.abs(deltaX), Math.abs(deltaY)) / GRID_SIZE
+      const stepX = deltaX === 0 ? 0 : GRID_SIZE * Math.sign(deltaX)
+      const stepY = deltaY === 0 ? 0 : GRID_SIZE * Math.sign(deltaY)
+
+      for (let step = 1; step <= steps; step += 1) {
+        const nextPos = {
+          left: startPos.left + stepX * step,
+          top: startPos.top + stepY * step,
+        }
+        if (checkCollisions(pieceId, nextPos, width, height)) {
+          return false
+        }
+      }
+
+      return true
+    },
+    [checkCollisions]
+  )
+
   const handleDragStart = useCallback(
     (id: number, e: React.MouseEvent | React.TouchEvent) => {
       const pos = positions.get(id)
@@ -261,6 +425,14 @@ function App() {
       let newLeft = snapToGrid(dragStartRef.current.startPos.left + deltaX)
       let newTop = snapToGrid(dragStartRef.current.startPos.top + deltaY)
 
+      if (newLeft !== dragStartRef.current.startPos.left && newTop !== dragStartRef.current.startPos.top) {
+        if (Math.abs(deltaX) >= Math.abs(deltaY)) {
+          newTop = dragStartRef.current.startPos.top
+        } else {
+          newLeft = dragStartRef.current.startPos.left
+        }
+      }
+
       const gameRect = gameRef.current.getBoundingClientRect()
       const gameWidth = gameRect.width - BORDER * 2
       const gameHeight = gameRect.height - BORDER * 2
@@ -280,7 +452,15 @@ function App() {
         currentPos.height
       )
 
-      if (!hasCollision) {
+      const hasClearPath = isPathClear(
+        dragStartRef.current.startPos,
+        { top: newTop, left: newLeft },
+        currentPos.width,
+        currentPos.height,
+        draggingId
+      )
+
+      if (!hasCollision && hasClearPath) {
         setPositions((prev) => {
           const newMap = new Map(prev)
           newMap.set(piece.id, {
@@ -292,7 +472,7 @@ function App() {
         })
       }
     },
-    [draggingId, positions, getPieceConfig, snapToGrid, checkCollisions]
+    [draggingId, positions, getPieceConfig, snapToGrid, checkCollisions, isPathClear]
   )
 
   const handleDragEnd = useCallback(() => {
