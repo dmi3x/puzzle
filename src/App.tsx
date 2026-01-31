@@ -1,12 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import './App.css'
 
-interface Move {
-  pieceId: number
-  toRow: number
-  toCol: number
-}
-
 const H = 1
 const V = 2
 const HV = 3
@@ -86,36 +80,6 @@ function isIntersect(
   return !(bLeft >= aRight || bRight <= aLeft || bTop >= aBottom || bBottom <= aTop)
 }
 
-// Optimal solution for this Klotski configuration (81 moves)
-const OPTIMAL_SOLUTION: Move[] = [
-  {pieceId:9,toRow:5,toCol:2},{pieceId:7,toRow:5,toCol:1},{pieceId:6,toRow:5,toCol:2},{pieceId:4,toRow:4,toCol:1},
-  {pieceId:1,toRow:2,toCol:1},{pieceId:2,toRow:1,toCol:1},{pieceId:3,toRow:2,toCol:4},{pieceId:5,toRow:4,toCol:4},
-  {pieceId:8,toRow:5,toCol:4},{pieceId:10,toRow:5,toCol:3},{pieceId:6,toRow:5,toCol:2},{pieceId:7,toRow:4,toCol:2},
-  {pieceId:9,toRow:4,toCol:1},{pieceId:4,toRow:5,toCol:1},{pieceId:1,toRow:3,toCol:1},{pieceId:2,toRow:2,toCol:1},
-  {pieceId:3,toRow:1,toCol:4},{pieceId:5,toRow:3,toCol:4},{pieceId:8,toRow:4,toCol:4},{pieceId:10,toRow:4,toCol:3},
-  {pieceId:6,toRow:4,toCol:2},{pieceId:7,toRow:3,toCol:2},{pieceId:9,toRow:3,toCol:1},{pieceId:4,toRow:4,toCol:1},
-  {pieceId:1,toRow:5,toCol:1},{pieceId:2,toRow:3,toCol:1},{pieceId:9,toRow:2,toCol:1},{pieceId:7,toRow:2,toCol:2},
-  {pieceId:10,toRow:2,toCol:3},{pieceId:8,toRow:2,toCol:4},{pieceId:5,toRow:4,toCol:4},{pieceId:3,toRow:2,toCol:4},
-  {pieceId:2,toRow:1,toCol:2},{pieceId:9,toRow:1,toCol:1},{pieceId:7,toRow:1,toCol:2},{pieceId:10,toRow:1,toCol:3},
-  {pieceId:8,toRow:1,toCol:4},{pieceId:5,toRow:3,toCol:4},{pieceId:3,toRow:1,toCol:4},{pieceId:2,toRow:2,toCol:2},
-  {pieceId:9,toRow:2,toCol:1},{pieceId:4,toRow:2,toCol:1},{pieceId:1,toRow:3,toCol:1},{pieceId:6,toRow:3,toCol:2},
-  {pieceId:7,toRow:4,toCol:2},{pieceId:10,toRow:4,toCol:3},{pieceId:8,toRow:4,toCol:4},{pieceId:5,toRow:5,toCol:4},
-  {pieceId:3,toRow:3,toCol:4},{pieceId:2,toRow:3,toCol:2},{pieceId:9,toRow:3,toCol:1},{pieceId:4,toRow:3,toCol:1},
-  {pieceId:1,toRow:4,toCol:1},{pieceId:6,toRow:5,toCol:2},{pieceId:7,toRow:5,toCol:1},{pieceId:9,toRow:5,toCol:2},
-  {pieceId:4,toRow:5,toCol:1},{pieceId:1,toRow:4,toCol:1},{pieceId:2,toRow:4,toCol:2},{pieceId:3,toRow:4,toCol:4},
-  {pieceId:5,toRow:3,toCol:4},{pieceId:8,toRow:3,toCol:4},{pieceId:10,toRow:3,toCol:3},{pieceId:7,toRow:3,toCol:2},
-  {pieceId:9,toRow:4,toCol:2},{pieceId:4,toRow:4,toCol:1},{pieceId:1,toRow:5,toCol:1},{pieceId:6,toRow:4,toCol:2},
-  {pieceId:2,toRow:5,toCol:2},{pieceId:3,toRow:5,toCol:4},{pieceId:5,toRow:4,toCol:4},{pieceId:8,toRow:2,toCol:4},
-  {pieceId:10,toRow:2,toCol:3},{pieceId:7,toRow:2,toCol:2},{pieceId:9,toRow:3,toCol:2},{pieceId:4,toRow:3,toCol:1},
-  {pieceId:1,toRow:4,toCol:1},{pieceId:6,toRow:5,toCol:2},{pieceId:2,toRow:4,toCol:2}
-]
-
-function solvePuzzle(): Move[] | null {
-  // Return pre-computed optimal solution
-  console.log(`✅ Using pre-computed optimal solution (${OPTIMAL_SOLUTION.length} moves)`)
-  return OPTIMAL_SOLUTION
-}
-
 interface PieceProps {
   config: PieceConfig
   position: PiecePosition
@@ -169,13 +133,6 @@ function App() {
     return map
   })
 
-  const [isAnimating, setIsAnimating] = useState(false)
-  const [currentMoveIndex, setCurrentMoveIndex] = useState(0)
-  const animationIntervalRef = useRef<number | null>(null)
-
-  const [solution, setSolution] = useState<Move[] | null>(null)
-  const [solutionStatus, setSolutionStatus] = useState<'idle' | 'solving' | 'solved' | 'error'>('idle')
-
   const dragStartRef = useRef<{ x: number; y: number; startPos: PiecePosition } | null>(null)
   const gameRef = useRef<HTMLDivElement>(null)
   const maxZIndexRef = useRef(initialPieces.length)
@@ -205,6 +162,36 @@ function App() {
       return false
     },
     [positions]
+  )
+
+  const isPathClear = useCallback(
+    (
+      startPos: PiecePosition,
+      targetPos: { top: number; left: number },
+      width: number,
+      height: number,
+      pieceId: number
+    ) => {
+      const deltaX = targetPos.left - startPos.left
+      const deltaY = targetPos.top - startPos.top
+
+      const steps = Math.max(Math.abs(deltaX), Math.abs(deltaY)) / GRID_SIZE
+      const stepX = deltaX === 0 ? 0 : GRID_SIZE * Math.sign(deltaX)
+      const stepY = deltaY === 0 ? 0 : GRID_SIZE * Math.sign(deltaY)
+
+      for (let step = 1; step <= steps; step += 1) {
+        const nextPos = {
+          left: startPos.left + stepX * step,
+          top: startPos.top + stepY * step,
+        }
+        if (checkCollisions(pieceId, nextPos, width, height)) {
+          return false
+        }
+      }
+
+      return true
+    },
+    [checkCollisions]
   )
 
   const handleDragStart = useCallback(
@@ -280,7 +267,15 @@ function App() {
         currentPos.height
       )
 
-      if (!hasCollision) {
+      const hasClearPath = isPathClear(
+        dragStartRef.current.startPos,
+        { top: newTop, left: newLeft },
+        currentPos.width,
+        currentPos.height,
+        draggingId
+      )
+
+      if (!hasCollision && hasClearPath) {
         setPositions((prev) => {
           const newMap = new Map(prev)
           newMap.set(piece.id, {
@@ -292,7 +287,7 @@ function App() {
         })
       }
     },
-    [draggingId, positions, getPieceConfig, snapToGrid, checkCollisions]
+    [draggingId, positions, getPieceConfig, snapToGrid, checkCollisions, isPathClear]
   )
 
   const handleDragEnd = useCallback(() => {
@@ -316,96 +311,6 @@ function App() {
     }
   }, [draggingId, handleDragMove, handleDragEnd])
 
-  const resetToInitialState = useCallback(() => {
-    const newPositions = new Map<number, PiecePosition>()
-    initialPieces.forEach((piece) => {
-      newPositions.set(piece.id, calculatePosition(piece.row, piece.col, piece.type))
-    })
-    setPositions(newPositions)
-    setCurrentMoveIndex(0)
-  }, [])
-
-  const stopAnimation = useCallback(() => {
-    if (animationIntervalRef.current) {
-      clearInterval(animationIntervalRef.current)
-      animationIntervalRef.current = null
-    }
-    setIsAnimating(false)
-  }, [])
-
-  const executeMove = useCallback((move: Move) => {
-    const piece = getPieceConfig(move.pieceId)
-    const newPosition = calculatePosition(move.toRow, move.toCol, piece.type)
-
-    setPositions((prev) => {
-      const newMap = new Map(prev)
-      newMap.set(move.pieceId, newPosition)
-      return newMap
-    })
-  }, [getPieceConfig])
-
-  const startAutoSolve = useCallback(() => {
-    if (isAnimating || !solution) return
-
-    const confirmed = window.confirm(
-      'This will reset the puzzle and show the animated solution. Continue?'
-    )
-
-    if (!confirmed) return
-
-    resetToInitialState()
-    setIsAnimating(true)
-
-    let moveIndex = 0
-
-    animationIntervalRef.current = setInterval(() => {
-      if (moveIndex >= solution.length) {
-        stopAnimation()
-        return
-      }
-
-      const move = solution[moveIndex]
-      executeMove(move)
-      setCurrentMoveIndex(moveIndex + 1)
-      moveIndex++
-    }, 500) // 500ms between moves
-  }, [isAnimating, solution, resetToInitialState, stopAnimation, executeMove])
-
-  useEffect(() => {
-    return () => {
-      if (animationIntervalRef.current) {
-        clearInterval(animationIntervalRef.current)
-      }
-    }
-  }, [])
-
-  // Compute solution on mount
-  useEffect(() => {
-    setSolutionStatus('solving')
-    console.log('Computing optimal solution...')
-    const startTime = Date.now()
-
-    // Run solver in a timeout to not block rendering
-    setTimeout(() => {
-      try {
-        const moves = solvePuzzle()
-        const endTime = Date.now()
-
-        if (moves) {
-          setSolution(moves)
-          setSolutionStatus('solved')
-          console.log(`Solution computed in ${endTime - startTime}ms`)
-        } else {
-          setSolutionStatus('error')
-          console.error('Failed to find solution')
-        }
-      } catch (error) {
-        setSolutionStatus('error')
-        console.error('Error computing solution:', error)
-      }
-    }, 100)
-  }, [])
-
   return (
     <>
       <h1>Help the panda get down</h1>
@@ -421,37 +326,9 @@ function App() {
         ))}
       </div>
       <div className="solution-container">
-        {solutionStatus === 'solving' && (
-          <button className="solution-button" disabled>
-            ⏳ Computing solution...
-          </button>
-        )}
-        {solutionStatus === 'error' && (
-          <button className="solution-button" disabled>
-            ❌ Failed to compute solution
-          </button>
-        )}
-        {solutionStatus === 'solved' && !isAnimating && (
-          <button
-            className="solution-button"
-            onClick={startAutoSolve}
-          >
-            🎬 Auto-Solve Puzzle ({solution?.length} moves)
-          </button>
-        )}
-        {isAnimating && (
-          <div className="animation-controls">
-            <button
-              className="solution-button stop-button"
-              onClick={stopAnimation}
-            >
-              ⏹️ Stop Animation
-            </button>
-            <p className="animation-status">
-              Move {currentMoveIndex} / {solution?.length || 0}
-            </p>
-          </div>
-        )}
+        <button className="solution-button" disabled>
+          🚫 Auto-solve is disabled
+        </button>
       </div>
     </>
   )
