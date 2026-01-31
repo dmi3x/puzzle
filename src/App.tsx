@@ -105,42 +105,54 @@ function getPieceSize(pieceId: number): { rows: number; cols: number } {
   }
 }
 
-function checkGridCollision(
+// Check if a piece can slide from one position to another
+function canSlide(
   pieceId: number,
-  row: number,
-  col: number,
+  fromRow: number,
+  fromCol: number,
+  toRow: number,
+  toCol: number,
   state: GameState
 ): boolean {
   const size = getPieceSize(pieceId)
 
-  // Check bounds (5 rows x 4 cols grid)
-  if (row < 1 || col < 1 || row + size.rows - 1 > 5 || col + size.cols - 1 > 4) {
-    return true
+  // Check bounds
+  if (toRow < 1 || toCol < 1 || toRow + size.rows - 1 > 5 || toCol + size.cols - 1 > 4) {
+    return false
   }
 
-  // Check collision with other pieces
-  for (const [otherId, otherPos] of state.positions) {
-    if (otherId === pieceId) continue
+  // Direction of movement
+  const deltaRow = toRow - fromRow
+  const deltaCol = toCol - fromCol
 
-    const otherSize = getPieceSize(otherId)
-
-    // Check if rectangles overlap
-    const thisRight = col + size.cols - 1
-    const thisBottom = row + size.rows - 1
-    const otherRight = otherPos.col + otherSize.cols - 1
-    const otherBottom = otherPos.row + otherSize.rows - 1
-
-    const overlaps = !(
-      col > otherRight ||
-      thisRight < otherPos.col ||
-      row > otherBottom ||
-      thisBottom < otherPos.row
-    )
-
-    if (overlaps) return true
+  // Must move exactly 1 cell in one direction only
+  if (Math.abs(deltaRow) + Math.abs(deltaCol) !== 1) {
+    return false
   }
 
-  return false
+  // Check all cells the piece will occupy in the new position
+  for (let r = toRow; r < toRow + size.rows; r++) {
+    for (let c = toCol; c < toCol + size.cols; c++) {
+      // Check if this cell overlaps with any other piece
+      for (const [otherId, otherPos] of state.positions) {
+        if (otherId === pieceId) continue
+
+        const otherSize = getPieceSize(otherId)
+
+        // Check if cell (r,c) is occupied by the other piece
+        if (
+          r >= otherPos.row &&
+          r < otherPos.row + otherSize.rows &&
+          c >= otherPos.col &&
+          c < otherPos.col + otherSize.cols
+        ) {
+          return false
+        }
+      }
+    }
+  }
+
+  return true
 }
 
 function getPossibleMoves(state: GameState): Move[] {
@@ -156,7 +168,7 @@ function getPossibleMoves(state: GameState): Move[] {
     ]
 
     for (const newPos of directions) {
-      if (!checkGridCollision(pieceId, newPos.row, newPos.col, state)) {
+      if (canSlide(pieceId, pos.row, pos.col, newPos.row, newPos.col, state)) {
         moves.push({
           pieceId,
           toRow: newPos.row,
@@ -200,7 +212,7 @@ function solvePuzzle(): Move[] | null {
   visited.add(serializeState(initialState))
 
   let statesExplored = 0
-  const maxStates = 100000 // Limit exploration
+  const maxStates = 1000000 // Limit exploration (increased for complex puzzle)
 
   while (queue.length > 0 && statesExplored < maxStates) {
     // A* - sort by priority
